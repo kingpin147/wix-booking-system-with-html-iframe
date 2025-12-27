@@ -31,7 +31,6 @@ export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
                 end: scheduling['endDate'],
                 location: locationObj['name'] || "Online",
                 slug: event.slug,
-                // Normalizing to Uppercase for easier frontend matching
                 registrationType: (registration['type'] || "RSVP").toUpperCase(),
                 mainImage: event.mainImage
             };
@@ -49,7 +48,6 @@ export const getEventTickets = webMethod(Permissions.Anyone, async (eventId) => 
     try {
         console.log("Backend: Fetching tickets for eventId:", eventId);
 
-        // Using $eq to be explicitly compliant with strict filtering if needed
         const result = await elevatedQueryTicketDefinitions({
             filter: { "eventId": { "$eq": eventId } }
         });
@@ -95,12 +93,6 @@ export const createEventRSVP = webMethod(Permissions.Anyone, async (eventId, gue
     try {
         console.log("Backend: Creating RSVP for:", eventId, "Guest:", JSON.stringify(guestDetails));
 
-        /**
-         * Resolving the RSVP status type error and argument mismatch:
-         * 1. We'll use a single RSVP object as the first argument.
-         * 2. We'll use bracket notation for 'status' to bypass the string-enum mismatch.
-         * 3. We'll use // @ts-ignore for the call itself to clear the IDE warning.
-         */
         const rsvpObject = {
             eventId: eventId,
             firstName: guestDetails.firstName,
@@ -108,18 +100,21 @@ export const createEventRSVP = webMethod(Permissions.Anyone, async (eventId, gue
             email: guestDetails.email
         };
 
-        // @ts-ignore
+        // Use bracket notation to avoid type mismatch in IDE
         rsvpObject['status'] = 'YES';
 
         console.log("Backend: Final RSVP object to send:", JSON.stringify(rsvpObject));
 
+        /**
+         * REMOVED the second argument {} to fix "Expected 0-1 arguments, but got 2".
+         * Using the rsvpObject directly as the single argument.
+         */
         // @ts-ignore
         const response = await elevatedCreateRsvp(rsvpObject);
         console.log("Backend: RSVP success:", JSON.stringify(response));
         return response;
     } catch (error) {
         console.error("Backend: createEventRSVP failed", error);
-        // Extracting meaningful message from potential server validation errors
         const errMsg = error.message || "Unknown RSVP Error";
         throw new Error(`RSVP Error: ${errMsg}`);
     }
