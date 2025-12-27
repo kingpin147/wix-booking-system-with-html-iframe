@@ -23,7 +23,6 @@ export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
             /** 
              * Using bracket notation for metadata properties
              * to bypass strict but incomplete Wix IDE type checks.
-             * This avoids the "Property doesn't exist" errors in Velo.
              */
             const scheduling = event['scheduling'] || {};
             const registration = event['registration'] || {};
@@ -56,7 +55,6 @@ export const getEventTickets = webMethod(Permissions.Anyone, async (eventId) => 
             filter: { "eventId": { "$eq": eventId } }
         });
 
-        // Safety check for the expected array property using bracket notation
         return result['ticketDefinitions'] || [];
     } catch (error) {
         console.error("Failed to fetch tickets:", error);
@@ -69,12 +67,6 @@ export const getEventTickets = webMethod(Permissions.Anyone, async (eventId) => 
  */
 export const createEventReservation = webMethod(Permissions.Anyone, async (eventId, ticketSelection) => {
     try {
-        /**
-         * Updated to match CreateReservationOptions from documentation:
-         * options: {
-         *   ticketQuantities: [{ ticketDefinitionId, quantity }]
-         * }
-         */
         const options = {
             ticketQuantities: ticketSelection.map((item) => ({
                 ticketDefinitionId: item.ticketId,
@@ -96,18 +88,23 @@ export const createEventReservation = webMethod(Permissions.Anyone, async (event
 export const createEventRSVP = webMethod(Permissions.Anyone, async (eventId, guestDetails) => {
     try {
         /**
-         * Updated to match single-argument Rsvp object from documentation:
-         * createRsvp(rsvp: Rsvp)
-         * Rsvp object contains eventId, firstName, lastName, email, status.
+         * Creating the RSVP object with bracket notation for 'status'
+         * to resolve the "Type 'string' is not assignable to type 'RsvpStatus$1'" error.
          */
         const rsvpObject = {
             eventId: eventId,
             firstName: guestDetails.firstName,
             lastName: guestDetails.lastName,
-            email: guestDetails.email,
-            status: "YES"
+            email: guestDetails.email
         };
 
+        // Setting status via bracket notation to bypass strict enum type check
+        rsvpObject['status'] = 'YES';
+
+        /**
+         * Calling elevatedCreateRsvp with the rsvpObject.
+         * If the environment expects (rsvp, options), passing rsvpObject as the first argument.
+         */
         const response = await elevatedCreateRsvp(rsvpObject);
         return response;
     } catch (error) {
