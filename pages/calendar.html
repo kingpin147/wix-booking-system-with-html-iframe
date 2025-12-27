@@ -418,7 +418,7 @@
             currentYear = startDate.getFullYear();
 
             if (selectedEvent.registrationType === 'TICKETS' && !ticketData[eventId]) {
-                console.log("Iframe: Requesting tickets for", eventId);
+                console.log("Iframe: Triggering ticket fetch for", eventId);
                 window.parent.postMessage({ type: 'GET_TICKETS', payload: { eventId } }, '*');
             }
 
@@ -470,15 +470,21 @@
             const container = document.getElementById('panel-content');
             const bookBtn = document.getElementById('main-book-btn');
 
+            console.log("Iframe: Registration Type:", selectedEvent.registrationType);
+
             if (selectedEvent.registrationType === 'TICKETS') {
                 const tickets = ticketData[selectedEvent.id];
-                console.log("Iframe: Rendering tickets", tickets);
+                console.log("Iframe: Rendering tickets for date:", selectedDate.toDateString(), tickets);
+
                 if (!tickets) {
                     container.innerHTML = '<p>Loading ticket options...</p>';
                     return;
                 }
                 if (tickets.length === 0) {
-                    container.innerHTML = '<p style="color: var(--text-muted);">No public tickets available for this date.</p>';
+                    container.innerHTML = `
+                        <p style="color: var(--text-muted);">No tickets found for this event.</p>
+                        <p style="font-size: 0.8rem; color: var(--text-muted); margin-top: 0.5rem;">Event ID: ${selectedEvent.id}</p>
+                    `;
                     bookBtn.disabled = true;
                     return;
                 }
@@ -487,7 +493,7 @@
                     return `
                         <div class="ticket-item ${qty > 0 ? 'active' : ''}">
                             <div>
-                                <div style="font-weight: 600;">${t.name || 'Ticket'}</div>
+                                <div style="font-weight: 600;">${t.name || 'General Admission'}</div>
                                 <div style="font-size: 0.8rem; color: var(--text-muted);">${t.price?.amount || '0'} ${t.price?.currency || ''}</div>
                             </div>
                             <div class="qty-controls">
@@ -498,6 +504,7 @@
                         </div>
                     `}).join('');
                 bookBtn.innerText = 'Purchase Tickets';
+                bookBtn.disabled = false;
             } else {
                 container.innerHTML = `
                     <div style="display: flex; flex-direction: column; gap: 0.75rem;">
