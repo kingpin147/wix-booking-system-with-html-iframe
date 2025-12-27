@@ -21,12 +21,13 @@ export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
 
         return results.items.map(event => {
             /** 
-             * Using bracket notation for ALL properties except known ID/slug/title/mainImage
+             * Using bracket notation for metadata properties
              * to bypass strict but incomplete Wix IDE type checks.
+             * This avoids the "Property doesn't exist" errors in Velo.
              */
-            const scheduling = (event as any)['scheduling'] || {};
-            const registration = (event as any)['registration'] || {};
-            const locationObj = (event as any)['location'] || {};
+            const scheduling = event['scheduling'] || {};
+            const registration = event['registration'] || {};
+            const locationObj = event['location'] || {};
 
             return {
                 id: event._id,
@@ -36,7 +37,7 @@ export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
                 end: scheduling['endDate'],
                 location: locationObj['name'] || "Online",
                 slug: event.slug,
-                registrationType: (registration['type']) || "RSVP",
+                registrationType: registration['type'] || "RSVP",
                 mainImage: event.mainImage
             };
         });
@@ -51,11 +52,11 @@ export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
  */
 export const getEventTickets = webMethod(Permissions.Anyone, async (eventId) => {
     try {
-        const result: any = await elevatedQueryTicketDefinitions({
+        const result = await elevatedQueryTicketDefinitions({
             filter: { "eventId": { "$eq": eventId } }
         });
 
-        // Safety check for the expected array property
+        // Safety check for the expected array property using bracket notation
         return result['ticketDefinitions'] || [];
     } catch (error) {
         console.error("Failed to fetch tickets:", error);
@@ -73,7 +74,7 @@ export const createEventReservation = webMethod(Permissions.Anyone, async (event
          * AppID for Wix Events: "14563d33-9122-4a0b-9df2-9b2f34963503"
          */
         const options = {
-            lineItems: ticketSelection.map((item: any) => ({
+            lineItems: ticketSelection.map((item) => ({
                 catalogReference: {
                     catalogItemId: item.ticketId,
                     appId: "14563d33-9122-4a0b-9df2-9b2f34963503"
