@@ -1,5 +1,5 @@
 import { Permissions, webMethod } from 'wix-web-module';
-import { orders, rsvp, ticketDefinitions } from 'wix-events.v2';
+import { orders, rsvp, ticketDefinitions, tickets } from 'wix-events.v2';
 import { wixEvents } from 'wix-events-backend';
 import { elevate } from 'wix-auth';
 
@@ -26,7 +26,7 @@ export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
             const locationObj = event['location'] || {};
             const status = event['status'];
 
-            console.log(`Backend: Event "${event.title}" status: ${status}, registrationType: ${registration.type}`);
+            console.log(`Backend: Event "${event.title}" status: ${status}, registrationType: ${registration['type']}`);
 
             return {
                 id: event._id,
@@ -49,40 +49,67 @@ export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
 });
 
 /**
- * Fetches ticket definitions for a specific event.
+ * Fetches ticket definitions for a specific event using manual filtering.
+ * Use this to get the PRODUCTS available for sale.
  */
 export const getEventTickets = webMethod(Permissions.Anyone, async (eventId) => {
     try {
         console.log("Backend: Fetching tickets for eventId:", eventId);
 
-        /**
-         * The previous log showed "total: 1" but "definitions: []".
-         * This can happen if the query defaults to a paging structure that hides results.
-         * Or if the event has tickets but they are technically 'private' or 'archived'.
-         * We'll try a very broad query.
-         */
-        const result = await elevatedQueryTicketDefinitions({
-            filter: { "eventId": eventId },
-            paging: { limit: 50, offset: 0 }
+        // Fetch all ticket definitions (limit 100) to ensure we get everything.
+        // We use queryTicketDefinitions so we get products (definitions), not purchased tickets.
+        const elevatedGetAll = elevate(async () => {
+            return await ticketDefinitions.queryTicketDefinitions().limit(100).find();
         });
 
-        console.log("Backend: V2 ticket query result structure:", JSON.stringify(result));
+        const result = await elevatedGetAll();
+        // @ts-ignore
+        const allTickets = result.definitions || result.items || [];
 
-        // Return definitions; fallback to results.items if definitions is missing
-        let tickets = result['ticketDefinitions'] || result['items'] || [];
-
-        /**
-         * If still empty, try querying the V1/Velo backend tickets as fallback 
-         * (though V2 is preferred).
-         */
-        if (tickets.length === 0) {
-            console.log("Backend: No tickets found in V2, check dashboard configuration.");
+        console.log(`Backend: Fetched ${allTickets.length} total definitions.`);
+        if (allTickets.length > 0) {
+            console.log("Backend: Sample Ticket[0]:", JSON.stringify(allTickets[0], null, 2));
+            console.log("Backend: Available EventIDs:", allTickets.map(t => t.eventId).join(", "));
         }
 
-        return tickets;
+        console.log("Backend: Filtering for Input EventId:", eventId);
+
+        // Manually filter by eventId. using == for loose string comparison safety
+        // @ts-ignore
+        const eventTickets = allTickets.filter(t => t.eventId == eventId);
+
+        console.log(`Backend: Found ${eventTickets.length} tickets for this event.`);
+
+        return eventTickets;
     } catch (error) {
         console.error("Backend: getEventTickets failed", error);
         throw new Error("Unable to load tickets.");
+    }
+});
+
+/**
+ * Lists actually SOLD tickets (Attendees) for an event.
+ * User requested this specific implementation with fieldsets.
+ */
+export const listSoldTickets = webMethod(Permissions.Anyone, async (eventId, options = {}) => {
+    try {
+        console.log("Backend: Listing SOLD tickets for eventId:", eventId);
+
+        const elevatedList = elevate(tickets.listTickets);
+
+        // Pass eventId as array as per V2 signature, and merge default options
+        const result = await elevatedList([eventId], {
+            limit: 100,
+            // User requested "TICKETS" and "DETAILS" - mapping to valid V2 Enums
+            fieldset: ['TICKET_DETAILS', 'GUEST_DETAILS'],
+            ...options
+        });
+
+        console.log("Backend: Sold tickets result:", JSON.stringify(result));
+        return result;
+    } catch (error) {
+        console.error("Backend: listSoldTickets failed", error);
+        throw error;
     }
 });
 
@@ -113,20 +140,24 @@ export const createEventReservation = webMethod(Permissions.Anyone, async (event
  */
 export const createEventRSVP = webMethod(Permissions.Anyone, async (eventId, guestDetails) => {
     try {
-        console.log("Backend: Creating RSVP for:", eventId, "Guest:", JSON.stringify(guestDetails));
+        const elevatedRsvp = elevate(async (eId, guest) => {
+            // "rsvp.email" error confirms we need the nested 'rsvp' key.
+            // "options.eventId" error suggests we might need to pass eventId in a specific way.
+            // We will provide the standard V2 structure: { rsvp: { eventId, ... } }
+            // and assume the wrapper handles the permissions correctly.
+            const rsvpInput = {
+                rsvp: {
+                    eventId: eId,
+                    firstName: guest.firstName,
+                    lastName: guest.lastName,
+                    email: guest.email,
+                    status: "YES"
+                }
+            };
+            return await rsvp.createRsvp(rsvpInput);
+        });
 
-        const inputObject = {
-            rsvp: {
-                eventId: eventId,
-                firstName: guestDetails.firstName,
-                lastName: guestDetails.lastName,
-                email: guestDetails.email,
-                status: "YES"
-            }
-        };
-
-        // @ts-ignore
-        const response = await elevatedCreateRsvp(inputObject);
+        const response = await elevatedRsvp(eventId, guestDetails);
         console.log("Backend: RSVP success:", JSON.stringify(response));
         return response;
     } catch (error) {
