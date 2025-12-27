@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Advanced Event Booking</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(255, 255, 255, 0.03);
+            --card-hover: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+            --gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+            --glass: rgba(15, 23, 42, 0.8);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            overflow-x: hidden;
+            padding: 2rem;
+        }
+
+        /* Views */
+        .view {
+            display: none;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        .view.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Header / Search */
+        .header-section {
+            margin-bottom: 3rem;
+            text-align: center;
+        }
+
+        .search-container {
+            max-width: 600px;
+            margin: 2rem auto;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 1rem 1.5rem;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 100px;
+            color: white;
+            font-family: inherit;
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.3s;
+        }
+
+        .search-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+        }
+
+        /* Grid - List View */
+        .events-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 2rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .event-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+        }
+
+        .event-card:hover {
+            transform: translateY(-10px);
+            background: var(--card-hover);
+            border-color: var(--primary);
+        }
+
+        .event-img {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+        }
+
+        .event-info {
+            padding: 1.5rem;
+        }
+
+        .event-tag {
+            font-size: 0.7rem;
+            padding: 4px 12px;
+            border-radius: 100px;
+            background: rgba(99, 102, 241, 0.1);
+            color: var(--primary);
+            font-weight: 600;
+            text-transform: uppercase;
+            margin-bottom: 0.75rem;
+            display: inline-block;
+        }
+
+        .event-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .event-meta {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Calendar View */
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-bottom: 2rem;
+            font-family: inherit;
+            font-weight: 600;
+        }
+
+        .back-btn:hover {
+            color: white;
+        }
+
+        .calendar-layout {
+            display: grid;
+            grid-template-columns: 1fr 350px;
+            gap: 3rem;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .calendar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0.5rem;
+        }
+
+        .day {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .day.has-event {
+            border-color: var(--primary);
+            color: var(--primary);
+            background: rgba(99, 102, 241, 0.05);
+        }
+
+        .day.selected {
+            background: var(--gradient);
+            color: white;
+            border: none;
+        }
+
+        .day.today {
+            text-decoration: underline;
+        }
+
+        .day.muted {
+            opacity: 0.2;
+            cursor: default;
+        }
+
+        /* Booking View / Sidebar */
+        .selection-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 24px;
+            padding: 2rem;
+            align-self: start;
+            position: sticky;
+            top: 2rem;
+        }
+
+        .ticket-item {
+            background: rgba(255, 255, 255, 0.02);
+            padding: 1rem;
+            border-radius: 16px;
+            margin-bottom: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .qty-controls {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .qty-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: none;
+            color: white;
+            cursor: pointer;
+        }
+
+        .book-btn {
+            width: 100%;
+            padding: 1rem;
+            border-radius: 16px;
+            background: var(--gradient);
+            color: white;
+            border: none;
+            font-family: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 1rem;
+        }
+
+        .book-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        @media (max-width: 900px) {
+            .calendar-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .selection-panel {
+                position: static;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- LIST VIEW -->
+    <div id="view-list" class="view active">
+        <div class="header-section">
+            <h1 style="font-size: 2.5rem; margin-bottom: 0.5rem;">Discover Events</h1>
+            <p style="color: var(--text-muted);">Find and book hundreds of amazing experiences</p>
+            <div class="search-container">
+                <input type="text" class="search-input" placeholder="Search events, locations, or dates..."
+                    oninput="handleSearch(this.value)">
+            </div>
+        </div>
+        <div class="events-grid" id="events-list">
+            <!-- Cards injected here -->
+        </div>
+    </div>
+
+    <!-- CALENDAR VIEW -->
+    <div id="view-calendar" class="view">
+        <button class="back-btn" onclick="switchView('view-list')">← Back to Explore</button>
+        <div class="calendar-layout">
+            <div class="main-content">
+                <div class="calendar-header">
+                    <h2 id="cal-month-name">Month Year</h2>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="qty-btn" onclick="changeMonth(-1)">←</button>
+                        <button class="qty-btn" onclick="changeMonth(1)">→</button>
+                    </div>
+                </div>
+                <div class="calendar-grid" id="cal-grid">
+                    <!-- Weekdays -->
+                    <div class="day muted">Sun</div>
+                    <div class="day muted">Mon</div>
+                    <div class="day muted">Tue</div>
+                    <div class="day muted">Wed</div>
+                    <div class="day muted">Thu</div>
+                    <div class="day muted">Fri</div>
+                    <div class="day muted">Sat</div>
+                    <!-- Days injected here -->
+                </div>
+            </div>
+            <div class="selection-panel" id="booking-panel">
+                <h3 id="panel-date">Select a Date</h3>
+                <div id="panel-content" style="margin: 1.5rem 0;">
+                    <p style="color: var(--text-muted);">Click on a highlighted date to see available slots and tickets.
+                    </p>
+                </div>
+                <button class="book-btn" id="main-book-btn" disabled onclick="handleBooking()">Reserve Now</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let allEvents = [];
+        let filteredEvents = [];
+        let selectedEvent = null;
+        let selectedDate = null;
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+        let ticketData = {}; // { eventId: [tickets] }
+        let currentTicketSelection = {}; // { ticketId: qty }
+
+        window.addEventListener('message', (event) => {
+            const { type, payload } = event.data;
+            if (type === 'SET_RAW_EVENTS') {
+                allEvents = payload;
+                filteredEvents = allEvents;
+                renderList();
+            }
+            if (type === 'SET_TICKETS') {
+                ticketData[payload.eventId] = payload.tickets;
+                if (selectedEvent && selectedEvent.id === payload.eventId) {
+                    renderBookingOptions();
+                }
+            }
+            if (type === 'RESERVATION_CREATED' || type === 'RSVP_CREATED') {
+                alert("Success! Your booking is confirmed.");
+                switchView('view-list');
+            }
+            if (type === 'ERROR') {
+                alert("Error: " + payload);
+            }
+        });
+
+        window.parent.postMessage({ type: 'READY' }, '*');
+
+        function switchView(viewId) {
+            document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            window.scrollTo(0, 0);
+        }
+
+        function handleSearch(query) {
+            const q = query.toLowerCase();
+            filteredEvents = allEvents.filter(e =>
+                e.title.toLowerCase().includes(q) ||
+                e.location.toLowerCase().includes(q)
+            );
+            renderList();
+        }
+
+        function renderList() {
+            const container = document.getElementById('events-list');
+            container.innerHTML = filteredEvents.map(e => `
+                <div class="event-card" onclick="openCalendar('${e.id}')">
+                    <img src="${e.mainImage || 'https://via.placeholder.com/400x200?text=Event'}" class="event-img">
+                    <div class="event-info">
+                        <span class="event-tag">${e.registrationType}</span>
+                        <div class="event-title">${e.title}</div>
+                        <div class="event-meta">📍 ${e.location}</div>
+                        <p style="color: var(--text-muted); font-size: 0.85rem; line-height: 1.5; height: 3.5em; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;">
+                            ${e.description ? e.description.replace(/<[^>]*>/g, '') : 'Join us for this amazing event...'}
+                        </p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function openCalendar(eventId) {
+            selectedEvent = allEvents.find(e => e.id === eventId);
+            selectedDate = null;
+            const startDate = new Date(selectedEvent.start);
+            currentMonth = startDate.getMonth();
+            currentYear = startDate.getFullYear();
+
+            // Fetch tickets if not loaded
+            if (selectedEvent.registrationType === 'TICKETS' && !ticketData[eventId]) {
+                window.parent.postMessage({ type: 'GET_TICKETS', payload: { eventId } }, '*');
+            }
+
+            renderCalendar();
+            document.getElementById('panel-content').innerHTML = '<p style="color: var(--text-muted);">Please select a date on the calendar.</p>';
+            document.getElementById('main-book-btn').disabled = true;
+            switchView('view-calendar');
+        }
+
+        function renderCalendar() {
+            const monthName = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date(currentYear, currentMonth));
+            document.getElementById('cal-month-name').innerText = monthName;
+
+            const grid = document.getElementById('cal-grid');
+            // Remove previous days but keep weekdays
+            while (grid.children.length > 7) grid.removeChild(grid.lastChild);
+
+            const first = new Date(currentYear, currentMonth, 1);
+            const last = new Date(currentYear, currentMonth + 1, 0);
+            const startDay = first.getDay();
+
+            // Muted padding days
+            for (let i = 0; i < startDay; i++) {
+                const el = document.createElement('div');
+                el.className = 'day muted';
+                grid.appendChild(el);
+            }
+
+            // Real days
+            for (let d = 1; d <= last.getDate(); d++) {
+                const date = new Date(currentYear, currentMonth, d);
+                const dayEl = document.createElement('div');
+                dayEl.className = 'day';
+                dayEl.innerText = d;
+
+                // Check if this date has the event
+                // Simplified: checking if start date matches. 
+                // For recurring events, you'd check if 'date' fits the recurrence rule.
+                const isEventDay = new Date(selectedEvent.start).toDateString() === date.toDateString();
+
+                if (isEventDay) dayEl.classList.add('has-event');
+                if (selectedDate && date.toDateString() === selectedDate.toDateString()) dayEl.classList.add('selected');
+
+                dayEl.onclick = () => {
+                    selectedDate = date;
+                    renderCalendar();
+                    renderBookingOptions();
+                };
+                grid.appendChild(dayEl);
+            }
+        }
+
+        function renderBookingOptions() {
+            document.getElementById('panel-date').innerText = selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+            const container = document.getElementById('panel-content');
+
+            if (selectedEvent.registrationType === 'TICKETS') {
+                const tickets = ticketData[selectedEvent.id];
+                if (!tickets) {
+                    container.innerHTML = '<p>Loading tickets...</p>';
+                    return;
+                }
+                container.innerHTML = tickets.map(t => `
+                    <div class="ticket-item">
+                        <div>
+                            <div style="font-weight: 600;">${t.name}</div>
+                            <div style="font-size: 0.8rem; color: var(--text-muted);">${t.price?.amount || '0'} ${t.price?.currency || ''}</div>
+                        </div>
+                        <div class="qty-controls">
+                            <button class="qty-btn" onclick="updateQty('${t._id}', -1)">-</button>
+                            <span>${currentTicketSelection[t._id] || 0}</span>
+                            <button class="qty-btn" onclick="updateQty('${t._id}', 1)">+</button>
+                        </div>
+                    </div>
+                `).join('');
+                document.getElementById('main-book-btn').innerText = 'Purchase Tickets';
+            } else {
+                container.innerHTML = `
+                    <div style="margin-bottom: 1rem;">
+                        <input type="text" id="rsvp-fname" placeholder="First Name" class="search-input" style="padding: 0.75rem; border-radius: 12px; margin-bottom: 0.5rem;">
+                        <input type="text" id="rsvp-lname" placeholder="Last Name" class="search-input" style="padding: 0.75rem; border-radius: 12px; margin-bottom: 0.5rem;">
+                        <input type="email" id="rsvp-email" placeholder="Email Address" class="search-input" style="padding: 0.75rem; border-radius: 12px;">
+                    </div>
+                `;
+                document.getElementById('main-book-btn').innerText = 'Confirm RSVP';
+            }
+            document.getElementById('main-book-btn').disabled = false;
+        }
+
+        function updateQty(id, delta) {
+            const current = currentTicketSelection[id] || 0;
+            currentTicketSelection[id] = Math.max(0, current + delta);
+            renderBookingOptions();
+        }
+
+        function handleBooking() {
+            if (selectedEvent.registrationType === 'TICKETS') {
+                const selection = Object.entries(currentTicketSelection)
+                    .filter(([id, qty]) => qty > 0)
+                    .map(([id, qty]) => ({ ticketId: id, quantity: qty }));
+
+                if (selection.length === 0) { alert("Please select at least one ticket."); return; }
+
+                window.parent.postMessage({
+                    type: 'CREATE_RESERVATION',
+                    payload: { eventId: selectedEvent.id, ticketSelection: selection }
+                }, '*');
+            } else {
+                const fname = document.getElementById('rsvp-fname').value;
+                const lname = document.getElementById('rsvp-lname').value;
+                const email = document.getElementById('rsvp-email').value;
+
+                if (!fname || !lname || !email) { alert("Please fill in all details."); return; }
+
+                window.parent.postMessage({
+                    type: 'CREATE_RSVP',
+                    payload: {
+                        eventId: selectedEvent.id,
+                        guestDetails: { firstName: fname, lastName: lname, email: email }
+                    }
+                }, '*');
+            }
+        }
+
+        function changeMonth(delta) {
+            currentMonth += delta;
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            renderCalendar();
+        }
+    </script>
+</body>
+
+</html>
