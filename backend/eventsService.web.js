@@ -48,15 +48,17 @@ export const getEventTickets = webMethod(Permissions.Anyone, async (eventId) => 
     try {
         console.log("Backend: Fetching tickets for eventId:", eventId);
 
+        /**
+         * Adding paging to ensure limit is not 0 (which appeared in user logs).
+         */
         const result = await elevatedQueryTicketDefinitions({
-            filter: { "eventId": { "$eq": eventId } }
+            filter: { "eventId": { "$eq": eventId } },
+            paging: { limit: 100 }
         });
 
         console.log("Backend: Ticket query full result:", JSON.stringify(result));
 
-        // Return definitions; ensure it's an array
-        const definitions = result['ticketDefinitions'] || [];
-        return definitions;
+        return result['ticketDefinitions'] || [];
     } catch (error) {
         console.error("Backend: getEventTickets failed", error);
         throw new Error("Unable to load tickets.");
@@ -78,7 +80,6 @@ export const createEventReservation = webMethod(Permissions.Anyone, async (event
         };
 
         const result = await elevatedCreateReservation(eventId, options);
-        console.log("Backend: Reservation success:", JSON.stringify(result));
         return result;
     } catch (error) {
         console.error("Backend: createEventReservation failed", error);
@@ -93,28 +94,28 @@ export const createEventRSVP = webMethod(Permissions.Anyone, async (eventId, gue
     try {
         console.log("Backend: Creating RSVP for:", eventId, "Guest:", JSON.stringify(guestDetails));
 
-        const rsvpObject = {
-            eventId: eventId,
-            firstName: guestDetails.firstName,
-            lastName: guestDetails.lastName,
-            email: guestDetails.email
+        /**
+         * Re-aligning with the error "rsvp.email must not be empty".
+         * Input must be wrapped in an 'rsvp' key as per the validator naming.
+         */
+        const inputObject = {
+            rsvp: {
+                eventId: eventId,
+                firstName: guestDetails.firstName,
+                lastName: guestDetails.lastName,
+                email: guestDetails.email,
+                status: "YES"
+            }
         };
 
-        // Use bracket notation to avoid type mismatch in IDE
-        rsvpObject['status'] = 'YES';
+        console.log("Backend: Final RSVP data to send:", JSON.stringify(inputObject));
 
-        console.log("Backend: Final RSVP object to send:", JSON.stringify(rsvpObject));
-
-        /**
-         * Using the rsvpObject directly as the single argument as per documentation tests.
-         */
         // @ts-ignore
-        const response = await elevatedCreateRsvp(rsvpObject);
+        const response = await elevatedCreateRsvp(inputObject);
         console.log("Backend: RSVP success:", JSON.stringify(response));
         return response;
     } catch (error) {
         console.error("Backend: createEventRSVP failed", error);
-        const errMsg = error.message || "Unknown RSVP Error";
-        throw new Error(`RSVP Error: ${errMsg}`);
+        throw new Error(`RSVP Error: ${error.message}`);
     }
 });

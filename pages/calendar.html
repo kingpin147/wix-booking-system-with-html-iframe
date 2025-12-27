@@ -374,6 +374,7 @@
             if (type === 'RESERVATION_CREATED' || type === 'RSVP_CREATED') {
                 alert("Success! Your booking is confirmed.");
                 switchView('view-list');
+                currentTicketSelection = {};
             }
             if (type === 'ERROR') {
                 alert(payload);
@@ -416,7 +417,6 @@
             currentMonth = startDate.getMonth();
             currentYear = startDate.getFullYear();
 
-            // Normalize check to match backend normalization
             if (selectedEvent.registrationType === 'TICKETS' && !ticketData[eventId]) {
                 console.log("Iframe: Requesting tickets for", eventId);
                 window.parent.postMessage({ type: 'GET_TICKETS', payload: { eventId } }, '*');
@@ -478,7 +478,8 @@
                     return;
                 }
                 if (tickets.length === 0) {
-                    container.innerHTML = '<p style="color: var(--text-muted);">No public tickets were found for this event in Wix.</p>';
+                    container.innerHTML = '<p style="color: var(--text-muted);">No public tickets available for this date.</p>';
+                    bookBtn.disabled = true;
                     return;
                 }
                 container.innerHTML = tickets.map(t => {
@@ -486,7 +487,7 @@
                     return `
                         <div class="ticket-item ${qty > 0 ? 'active' : ''}">
                             <div>
-                                <div style="font-weight: 600;">${t.name || 'General Admission'}</div>
+                                <div style="font-weight: 600;">${t.name || 'Ticket'}</div>
                                 <div style="font-size: 0.8rem; color: var(--text-muted);">${t.price?.amount || '0'} ${t.price?.currency || ''}</div>
                             </div>
                             <div class="qty-controls">
@@ -506,8 +507,8 @@
                     </div>
                 `;
                 bookBtn.innerText = 'Confirm RSVP';
+                bookBtn.disabled = false;
             }
-            bookBtn.disabled = false;
         }
 
         function updateQty(id, delta) {
