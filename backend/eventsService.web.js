@@ -14,14 +14,19 @@ const elevatedCreateRsvp = elevate(rsvp.createRsvp);
 export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
     try {
         const results = await wixEvents.queryEvents()
-            .eq("status", "SCHEDULED")
+            // Try querying all events first to see if status filtering is hiding "Music Festival"
             .descending("scheduling.startDate")
             .find();
+
+        console.log("Backend: Found", results.items.length, "total events.");
 
         return results.items.map(event => {
             const scheduling = event['scheduling'] || {};
             const registration = event['registration'] || {};
             const locationObj = event['location'] || {};
+            const status = event['status'];
+
+            console.log(`Backend: Event "${event.title}" status: ${status}, registrationType: ${registration.type}`);
 
             return {
                 id: event._id,
@@ -31,8 +36,10 @@ export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
                 end: scheduling['endDate'],
                 location: locationObj['name'] || "Online",
                 slug: event.slug,
+                // Normalized to Uppercase
                 registrationType: (registration['type'] || "RSVP").toUpperCase(),
-                mainImage: event.mainImage
+                mainImage: event.mainImage,
+                status: status
             };
         });
     } catch (error) {
@@ -48,36 +55,31 @@ export const getEventTickets = webMethod(Permissions.Anyone, async (eventId) => 
     try {
         console.log("Backend: Fetching tickets for eventId:", eventId);
 
-        // Diagnostic: What event matches this ID?
-        const eventQuery = await wixEvents.queryEvents().eq("_id", eventId).find();
-        if (eventQuery.items.length > 0) {
-            console.log("Backend: Found event for ticket query:", eventQuery.items[0].title);
-        } else {
-            console.log("Backend: No event found with ID:", eventId);
-        }
-
         /**
-         * Re-trying the query with multiple variants to see what sticks.
-         * I suspect the V2 API might be sensitive to the filter structure.
+         * The previous log showed "total: 1" but "definitions: []".
+         * This can happen if the query defaults to a paging structure that hides results.
+         * Or if the event has tickets but they are technically 'private' or 'archived'.
+         * We'll try a very broad query.
          */
         const result = await elevatedQueryTicketDefinitions({
             filter: { "eventId": eventId },
-            paging: { limit: 10, offset: 0 }
+            paging: { limit: 50, offset: 0 }
         });
 
-        console.log("Backend: V2 ticketDefinitions.query result:", JSON.stringify(result));
+        console.log("Backend: V2 ticket query result structure:", JSON.stringify(result));
 
-        // If definitions is empty but total > 0, something is wrong with paging or the API call.
-        let definitions = result['ticketDefinitions'] || [];
+        // Return definitions; fallback to results.items if definitions is missing
+        let tickets = result['ticketDefinitions'] || result['items'] || [];
 
-        // Fallback: Try a different property if definitions is empty
-        if (definitions.length === 0 && result['items']) {
-            definitions = result['items'];
-            console.log("Backend: Used 'items' fallback for tickets.");
+        /**
+         * If still empty, try querying the V1/Velo backend tickets as fallback 
+         * (though V2 is preferred).
+         */
+        if (tickets.length === 0) {
+            console.log("Backend: No tickets found in V2, check dashboard configuration.");
         }
 
-        console.log("Backend: Returning tickets count:", definitions.length);
-        return definitions;
+        return tickets;
     } catch (error) {
         console.error("Backend: getEventTickets failed", error);
         throw new Error("Unable to load tickets.");
@@ -89,7 +91,7 @@ export const getEventTickets = webMethod(Permissions.Anyone, async (eventId) => 
  */
 export const createEventReservation = webMethod(Permissions.Anyone, async (eventId, ticketSelection) => {
     try {
-        console.log("Backend: Creating reservation for:", eventId, "with selection:", JSON.stringify(ticketSelection));
+        console.log("Backend: Creating reservation for:", eventId, "Selection:", JSON.stringify(ticketSelection));
 
         const options = {
             ticketQuantities: ticketSelection.map((item) => ({
@@ -122,8 +124,6 @@ export const createEventRSVP = webMethod(Permissions.Anyone, async (eventId, gue
                 status: "YES"
             }
         };
-
-        console.log("Backend: Final RSVP data to send:", JSON.stringify(inputObject));
 
         // @ts-ignore
         const response = await elevatedCreateRsvp(inputObject);
