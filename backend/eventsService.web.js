@@ -10,7 +10,6 @@ const elevatedCreateRsvp = elevate(rsvp.createRsvp);
 
 /**
  * Fetches upcoming events for the calendar.
- * Uses wix-events-backend (V1) because it provides a reliable search across all events.
  */
 export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
     try {
@@ -32,41 +31,45 @@ export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
                 end: scheduling['endDate'],
                 location: locationObj['name'] || "Online",
                 slug: event.slug,
-                // Normalizing registration type casing
                 registrationType: (registration['type'] || "RSVP").toUpperCase(),
                 mainImage: event.mainImage
             };
         });
     } catch (error) {
-        console.error("Failed to fetch events:", error);
+        console.error("Backend: listUpcomingEvents failed", error);
         throw new Error("Unable to load events.");
     }
 });
 
 /**
- * Fetches ticket definitions for a specific event using wix-events.v2.
+ * Fetches ticket definitions for a specific event.
  */
 export const getEventTickets = webMethod(Permissions.Anyone, async (eventId) => {
     try {
-        console.log("Fetching tickets for event:", eventId);
+        console.log("Backend: Fetching tickets for eventId:", eventId);
+
+        // V2 Query structure
         const result = await elevatedQueryTicketDefinitions({
             filter: { "eventId": { "$eq": eventId } }
         });
 
-        const tickets = result['ticketDefinitions'] || [];
-        console.log(`Found ${tickets.length} tickets.`);
-        return tickets;
+        console.log("Backend: Raw ticket result:", JSON.stringify(result));
+
+        // Return both definitions AND potential root-level arrays just in case
+        return result['ticketDefinitions'] || result['items'] || result || [];
     } catch (error) {
-        console.error("Failed to fetch tickets:", error);
+        console.error("Backend: getEventTickets failed", error);
         throw new Error("Unable to load tickets.");
     }
 });
 
 /**
- * Creates a ticket reservation using wix-events.v2.
+ * Creates a ticket reservation.
  */
 export const createEventReservation = webMethod(Permissions.Anyone, async (eventId, ticketSelection) => {
     try {
+        console.log("Backend: Creating reservation for:", eventId, "with selection:", JSON.stringify(ticketSelection));
+
         const options = {
             ticketQuantities: ticketSelection.map((item) => ({
                 ticketDefinitionId: item.ticketId,
@@ -75,22 +78,25 @@ export const createEventReservation = webMethod(Permissions.Anyone, async (event
         };
 
         const result = await elevatedCreateReservation(eventId, options);
+        console.log("Backend: Reservation success:", JSON.stringify(result));
         return result;
     } catch (error) {
-        console.error("Failed to create reservation:", error);
+        console.error("Backend: createEventReservation failed", error);
         throw new Error("Unable to reserve tickets. " + error.message);
     }
 });
 
 /**
- * Creates an RSVP using wix-events.v2.
+ * Creates an RSVP.
  */
 export const createEventRSVP = webMethod(Permissions.Anyone, async (eventId, guestDetails) => {
     try {
+        console.log("Backend: Creating RSVP for:", eventId, "with guest:", JSON.stringify(guestDetails));
+
         /**
-         * The error "rsvp.email must not be empty" suggests the API expects 
-         * an object with an 'rsvp' property or specific nesting.
-         * Let's follow the structure indicated by the error field paths.
+         * Re-evaluating the RSVP structure based on the error: "rsvp.email must not be empty".
+         * This usually means the server expects a body like { "rsvp": { ... } }.
+         * If elevatedCreateRsvp is a wrapper for a JSON RPC call, we might need a specific shape.
          */
         const rsvpData = {
             eventId: eventId,
@@ -100,12 +106,19 @@ export const createEventRSVP = webMethod(Permissions.Anyone, async (eventId, gue
             status: "YES"
         };
 
-        // Trying the structure suggested by the field violation error prefix "rsvp."
-        const response = await elevatedCreateRsvp({ rsvp: rsvpData });
+        // Most V2 APIs in Velo expect the object directly, but let's try the wrapped structure 
+        // IF the validator is prefixing with 'rsvp.'
+        // Actually, if I already tried that and it failed, I'll try the most standard 2nd arg approach if available.
+        // But the docs show createRsvp(rsvp, options).
+
+        console.log("Backend: Sending rsvpData:", JSON.stringify(rsvpData));
+
+        // Try passing it as the first argument directly, as per docs
+        const response = await elevatedCreateRsvp(rsvpData);
+        console.log("Backend: RSVP success:", JSON.stringify(response));
         return response;
     } catch (error) {
-        console.error("Failed to create RSVP:", error);
-        // Returning detailed error to the frontend for debugging
+        console.error("Backend: createEventRSVP failed", error);
         throw new Error(`RSVP Error: ${error.message}`);
     }
 });
