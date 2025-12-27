@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Booking Calendar</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --primary: #6366f1;
+            --primary-hover: #4f46e5;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border: rgba(255, 255, 255, 0.1);
+            --gradient: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-dark);
+            color: var(--text-main);
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+        }
+
+        .calendar-container {
+            flex: 1;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            backdrop-filter: blur(10px);
+            min-width: 320px;
+        }
+
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        #month-display {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: var(--gradient);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .nav-btns {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .nav-btn {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            color: white;
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .nav-btn:hover {
+            background: var(--border);
+            transform: translateY(-2px);
+        }
+
+        .calendar-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 0.5rem;
+            flex: 1;
+        }
+
+        .weekday {
+            text-align: center;
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-transform: uppercase;
+            padding-bottom: 0.25rem;
+        }
+
+        .day {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 0.5rem;
+            min-height: 60px;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            cursor: pointer;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .day:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary);
+            transform: scale(1.02);
+            z-index: 10;
+        }
+
+        .day.other-month {
+            opacity: 0.2;
+            cursor: default;
+        }
+
+        .day.today {
+            border: 2px solid var(--primary);
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .day-num {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .events-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 2px;
+        }
+
+        .event-dot {
+            height: 4px;
+            width: 4px;
+            border-radius: 50%;
+            background: var(--primary);
+        }
+
+        .event-dot.tickets {
+            background: #f43f5e;
+        }
+
+        .side-panel {
+            width: 350px;
+            background: rgba(15, 23, 42, 0.9);
+            border-left: 1px solid var(--border);
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            overflow-y: auto;
+            transition: transform 0.3s ease;
+        }
+
+        .side-panel h3 {
+            font-size: 1.25rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .event-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            padding: 1.25rem;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            animation: slideIn 0.4s ease-out;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .event-type {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 100px;
+            text-transform: uppercase;
+            font-weight: 600;
+            width: fit-content;
+        }
+
+        .type-tickets {
+            background: rgba(244, 63, 94, 0.2);
+            color: #fb7185;
+        }
+
+        .type-free {
+            background: rgba(16, 185, 129, 0.2);
+            color: #34d399;
+        }
+
+        .book-btn {
+            background: var(--gradient);
+            color: white;
+            border: none;
+            padding: 0.75rem;
+            border-radius: 12px;
+            font-family: inherit;
+            font-weight: 600;
+            cursor: pointer;
+            transition: opacity 0.2s;
+        }
+
+        .book-btn:hover {
+            opacity: 0.9;
+        }
+
+        .empty-state {
+            color: var(--text-muted);
+            text-align: center;
+            margin-top: 5rem;
+        }
+
+        /* Mobile Adjustments */
+        @media (max-width: 768px) {
+            body {
+                flex-direction: column;
+                overflow-y: auto;
+                height: auto;
+            }
+
+            .calendar-container {
+                padding: 1rem;
+                height: auto;
+            }
+
+            .calendar-grid {
+                gap: 4px;
+            }
+
+            .day {
+                min-height: 50px;
+                padding: 4px;
+            }
+
+            .day-num {
+                font-size: 0.8rem;
+            }
+
+            .side-panel {
+                width: 100%;
+                border-left: none;
+                border-top: 1px solid var(--border);
+                height: auto;
+                min-height: 300px;
+                padding: 1.5rem;
+            }
+
+            header {
+                margin-bottom: 0.5rem;
+            }
+
+            #month-display {
+                font-size: 1.2rem;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <div class="calendar-container">
+        <header>
+            <h2 id="month-display">January 2026</h2>
+            <div class="nav-btns">
+                <button class="nav-btn" onclick="changeMonth(-1)">←</button>
+                <button class="nav-btn" onclick="changeMonth(1)">→</button>
+            </div>
+        </header>
+
+        <div class="calendar-grid" id="grid">
+            <div class="weekday">Sun</div>
+            <div class="weekday">Mon</div>
+            <div class="weekday">Tue</div>
+            <div class="weekday">Wed</div>
+            <div class="weekday">Thu</div>
+            <div class="weekday">Fri</div>
+            <div class="weekday">Sat</div>
+        </div>
+    </div>
+
+    <div class="side-panel">
+        <h3 id="selected-date">Events</h3>
+        <div id="event-list">
+            <div class="empty-state">Select a date with events to see details</div>
+        </div>
+    </div>
+
+    <script>
+        let currentMonth = new Date().getMonth();
+        let currentYear = new Date().getFullYear();
+        let rawEvents = [];
+        let groupedEvents = {};
+
+        function processEvents(events) {
+            return events.reduce((acc, event) => {
+                const dateKey = new Date(event.start).toDateString();
+                if (!acc[dateKey]) acc[dateKey] = [];
+                acc[dateKey].push(event);
+                return acc;
+            }, {});
+        }
+
+        window.addEventListener('message', (event) => {
+            if (event.data.type === 'SET_RAW_EVENTS') {
+                rawEvents = event.data.payload;
+                groupedEvents = processEvents(rawEvents);
+                render();
+            }
+        });
+
+        window.parent.postMessage({ type: 'READY' }, '*');
+
+        function getDays(month, year) {
+            const first = new Date(year, month, 1);
+            const last = new Date(year, month + 1, 0);
+            const days = [];
+            const startDay = first.getDay();
+            for (let i = startDay - 1; i >= 0; i--) days.push({ d: new Date(year, month, -i), current: false });
+            for (let i = 1; i <= last.getDate(); i++) days.push({ d: new Date(year, month, i), current: true });
+            return days;
+        }
+
+        function render() {
+            const grid = document.getElementById('grid');
+            const weekdays = Array.from(grid.querySelectorAll('.weekday'));
+            grid.innerHTML = '';
+            weekdays.forEach(w => grid.appendChild(w));
+
+            const days = getDays(currentMonth, currentYear);
+            document.getElementById('month-display').innerText =
+                new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' }).format(new Date(currentYear, currentMonth));
+
+            days.forEach(day => {
+                const dayEl = document.createElement('div');
+                dayEl.className = `day ${!day.current ? 'other-month' : ''}`;
+                const dateKey = day.d.toDateString();
+                const dayEvents = groupedEvents[dateKey] || [];
+
+                if (new Date().toDateString() === dateKey) dayEl.classList.add('today');
+
+                dayEl.innerHTML = `
+                    <span class="day-num">${day.d.getDate()}</span>
+                    <div class="events-container">
+                        ${dayEvents.map(e => `<div class="event-dot ${e.registrationType === 'TICKETS' ? 'tickets' : ''}"></div>`).join('')}
+                    </div>
+                `;
+
+                dayEl.onclick = () => {
+                    if (day.current) {
+                        showEvents(dayEvents, day.d);
+                        if (window.innerWidth <= 768) {
+                            document.querySelector('.side-panel').scrollIntoView({ behavior: 'smooth' });
+                        }
+                    }
+                };
+                grid.appendChild(dayEl);
+            });
+        }
+
+        function showEvents(dayEvents, date) {
+            document.getElementById('selected-date').innerText = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            const list = document.getElementById('event-list');
+            if (dayEvents.length === 0) { list.innerHTML = '<div class="empty-state">No events for this day</div>'; return; }
+
+            list.innerHTML = dayEvents.map(e => `
+                <div class="event-card">
+                    <span class="event-type ${e.registrationType === 'TICKETS' ? 'type-tickets' : 'type-free'}">
+                        ${e.registrationType === 'TICKETS' ? 'Tickets Required' : 'Free RSVP'}
+                    </span>
+                    <h4>${e.title}</h4>
+                    <p style="color: var(--text-muted); font-size: 0.9rem;">🕒 ${new Date(e.start).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                    <button class="book-btn" onclick="bookEvent('${e.id}')">${e.registrationType === 'TICKETS' ? 'Get Tickets' : 'Reserve Spot'}</button>
+                </div>
+            `).join('');
+        }
+
+        function bookEvent(id) {
+            window.parent.postMessage({ type: 'BOOK_EVENT', payload: { id } }, '*');
+        }
+
+        function changeMonth(delta) {
+            currentMonth += delta;
+            if (currentMonth > 11) { currentMonth = 0; currentYear++; }
+            if (currentMonth < 0) { currentMonth = 11; currentYear--; }
+            render();
+        }
+
+        render();
+    </script>
+</body>
+
+</html>
