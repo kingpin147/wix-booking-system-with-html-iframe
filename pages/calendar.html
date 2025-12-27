@@ -345,11 +345,12 @@
         let selectedDate = null;
         let currentMonth = new Date().getMonth();
         let currentYear = new Date().getFullYear();
-        let ticketData = {}; // { eventId: [tickets] }
-        let currentTicketSelection = {}; // { ticketId: qty }
+        let ticketData = {};
+        let currentTicketSelection = {};
 
         window.addEventListener('message', (event) => {
             const { type, payload } = event.data;
+            console.log("Iframe received message:", type, payload);
             if (type === 'SET_RAW_EVENTS') {
                 allEvents = payload;
                 filteredEvents = allEvents;
@@ -411,8 +412,7 @@
             currentMonth = startDate.getMonth();
             currentYear = startDate.getFullYear();
 
-            // Fetch tickets if not loaded
-            if (selectedEvent.registrationType === 'TICKETS' && !ticketData[eventId]) {
+            if (selectedEvent.registrationType.toUpperCase() === 'TICKETS' && !ticketData[eventId]) {
                 window.parent.postMessage({ type: 'GET_TICKETS', payload: { eventId } }, '*');
             }
 
@@ -427,30 +427,24 @@
             document.getElementById('cal-month-name').innerText = monthName;
 
             const grid = document.getElementById('cal-grid');
-            // Remove previous days but keep weekdays
             while (grid.children.length > 7) grid.removeChild(grid.lastChild);
 
             const first = new Date(currentYear, currentMonth, 1);
             const last = new Date(currentYear, currentMonth + 1, 0);
             const startDay = first.getDay();
 
-            // Muted padding days
             for (let i = 0; i < startDay; i++) {
                 const el = document.createElement('div');
                 el.className = 'day muted';
                 grid.appendChild(el);
             }
 
-            // Real days
             for (let d = 1; d <= last.getDate(); d++) {
                 const date = new Date(currentYear, currentMonth, d);
                 const dayEl = document.createElement('div');
                 dayEl.className = 'day';
                 dayEl.innerText = d;
 
-                // Check if this date has the event
-                // Simplified: checking if start date matches. 
-                // For recurring events, you'd check if 'date' fits the recurrence rule.
                 const isEventDay = new Date(selectedEvent.start).toDateString() === date.toDateString();
 
                 if (isEventDay) dayEl.classList.add('has-event');
@@ -466,13 +460,18 @@
         }
 
         function renderBookingOptions() {
+            if (!selectedDate) return;
             document.getElementById('panel-date').innerText = selectedDate.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
             const container = document.getElementById('panel-content');
 
-            if (selectedEvent.registrationType === 'TICKETS') {
+            if (selectedEvent.registrationType.toUpperCase() === 'TICKETS') {
                 const tickets = ticketData[selectedEvent.id];
                 if (!tickets) {
                     container.innerHTML = '<p>Loading tickets...</p>';
+                    return;
+                }
+                if (tickets.length === 0) {
+                    container.innerHTML = '<p style="color: var(--text-muted);">No ticket definitions found for this event.</p>';
                     return;
                 }
                 container.innerHTML = tickets.map(t => `
@@ -492,9 +491,9 @@
             } else {
                 container.innerHTML = `
                     <div style="margin-bottom: 1rem;">
-                        <input type="text" id="rsvp-fname" placeholder="First Name" class="search-input" style="padding: 0.75rem; border-radius: 12px; margin-bottom: 0.5rem;">
-                        <input type="text" id="rsvp-lname" placeholder="Last Name" class="search-input" style="padding: 0.75rem; border-radius: 12px; margin-bottom: 0.5rem;">
-                        <input type="email" id="rsvp-email" placeholder="Email Address" class="search-input" style="padding: 0.75rem; border-radius: 12px;">
+                        <input type="text" id="rsvp-fname" placeholder="First Name" class="search-input" style="padding: 0.75rem; border-radius: 12px; margin-bottom: 0.5rem;" value="">
+                        <input type="text" id="rsvp-lname" placeholder="Last Name" class="search-input" style="padding: 0.75rem; border-radius: 12px; margin-bottom: 0.5rem;" value="">
+                        <input type="email" id="rsvp-email" placeholder="Email Address" class="search-input" style="padding: 0.75rem; border-radius: 12px;" value="">
                     </div>
                 `;
                 document.getElementById('main-book-btn').innerText = 'Confirm RSVP';
@@ -509,7 +508,7 @@
         }
 
         function handleBooking() {
-            if (selectedEvent.registrationType === 'TICKETS') {
+            if (selectedEvent.registrationType.toUpperCase() === 'TICKETS') {
                 const selection = Object.entries(currentTicketSelection)
                     .filter(([id, qty]) => qty > 0)
                     .map(([id, qty]) => ({ ticketId: id, quantity: qty }));

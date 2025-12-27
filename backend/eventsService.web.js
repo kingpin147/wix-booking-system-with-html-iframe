@@ -20,10 +20,6 @@ export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
             .find();
 
         return results.items.map(event => {
-            /** 
-             * Using bracket notation for metadata properties
-             * to bypass strict but incomplete Wix IDE type checks.
-             */
             const scheduling = event['scheduling'] || {};
             const registration = event['registration'] || {};
             const locationObj = event['location'] || {};
@@ -36,7 +32,8 @@ export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
                 end: scheduling['endDate'],
                 location: locationObj['name'] || "Online",
                 slug: event.slug,
-                registrationType: registration['type'] || "RSVP",
+                // Normalizing registration type casing
+                registrationType: (registration['type'] || "RSVP").toUpperCase(),
                 mainImage: event.mainImage
             };
         });
@@ -51,11 +48,14 @@ export const listUpcomingEvents = webMethod(Permissions.Anyone, async () => {
  */
 export const getEventTickets = webMethod(Permissions.Anyone, async (eventId) => {
     try {
+        console.log("Fetching tickets for event:", eventId);
         const result = await elevatedQueryTicketDefinitions({
             filter: { "eventId": { "$eq": eventId } }
         });
 
-        return result['ticketDefinitions'] || [];
+        const tickets = result['ticketDefinitions'] || [];
+        console.log(`Found ${tickets.length} tickets.`);
+        return tickets;
     } catch (error) {
         console.error("Failed to fetch tickets:", error);
         throw new Error("Unable to load tickets.");
@@ -78,7 +78,7 @@ export const createEventReservation = webMethod(Permissions.Anyone, async (event
         return result;
     } catch (error) {
         console.error("Failed to create reservation:", error);
-        throw new Error("Unable to reserve tickets.");
+        throw new Error("Unable to reserve tickets. " + error.message);
     }
 });
 
@@ -88,27 +88,24 @@ export const createEventReservation = webMethod(Permissions.Anyone, async (event
 export const createEventRSVP = webMethod(Permissions.Anyone, async (eventId, guestDetails) => {
     try {
         /**
-         * Creating the RSVP object with bracket notation for 'status'
-         * to resolve the "Type 'string' is not assignable to type 'RsvpStatus$1'" error.
+         * The error "rsvp.email must not be empty" suggests the API expects 
+         * an object with an 'rsvp' property or specific nesting.
+         * Let's follow the structure indicated by the error field paths.
          */
-        const rsvpObject = {
+        const rsvpData = {
             eventId: eventId,
             firstName: guestDetails.firstName,
             lastName: guestDetails.lastName,
-            email: guestDetails.email
+            email: guestDetails.email,
+            status: "YES"
         };
 
-        // Setting status via bracket notation to bypass strict enum type check
-        rsvpObject['status'] = 'YES';
-
-        /**
-         * Calling elevatedCreateRsvp with the rsvpObject.
-         * If the environment expects (rsvp, options), passing rsvpObject as the first argument.
-         */
-        const response = await elevatedCreateRsvp(rsvpObject);
+        // Trying the structure suggested by the field violation error prefix "rsvp."
+        const response = await elevatedCreateRsvp({ rsvp: rsvpData });
         return response;
     } catch (error) {
         console.error("Failed to create RSVP:", error);
-        throw new Error("Unable to confirm RSVP.");
+        // Returning detailed error to the frontend for debugging
+        throw new Error(`RSVP Error: ${error.message}`);
     }
 });
