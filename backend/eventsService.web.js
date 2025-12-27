@@ -106,8 +106,7 @@ export const createEventRSVP = webMethod(Permissions.Anyone, async (eventId, gue
         console.log("Backend: Final RSVP object to send:", JSON.stringify(rsvpObject));
 
         /**
-         * REMOVED the second argument {} to fix "Expected 0-1 arguments, but got 2".
-         * Using the rsvpObject directly as the single argument.
+         * Using the rsvpObject directly as the single argument as per documentation tests.
          */
         // @ts-ignore
         const response = await elevatedCreateRsvp(rsvpObject);
