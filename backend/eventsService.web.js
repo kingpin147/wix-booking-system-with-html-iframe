@@ -48,17 +48,36 @@ export const getEventTickets = webMethod(Permissions.Anyone, async (eventId) => 
     try {
         console.log("Backend: Fetching tickets for eventId:", eventId);
 
+        // Diagnostic: What event matches this ID?
+        const eventQuery = await wixEvents.queryEvents().eq("_id", eventId).find();
+        if (eventQuery.items.length > 0) {
+            console.log("Backend: Found event for ticket query:", eventQuery.items[0].title);
+        } else {
+            console.log("Backend: No event found with ID:", eventId);
+        }
+
         /**
-         * Adding paging to ensure limit is not 0 (which appeared in user logs).
+         * Re-trying the query with multiple variants to see what sticks.
+         * I suspect the V2 API might be sensitive to the filter structure.
          */
         const result = await elevatedQueryTicketDefinitions({
-            filter: { "eventId": { "$eq": eventId } },
-            paging: { limit: 100 }
+            filter: { "eventId": eventId },
+            paging: { limit: 10, offset: 0 }
         });
 
-        console.log("Backend: Ticket query full result:", JSON.stringify(result));
+        console.log("Backend: V2 ticketDefinitions.query result:", JSON.stringify(result));
 
-        return result['ticketDefinitions'] || [];
+        // If definitions is empty but total > 0, something is wrong with paging or the API call.
+        let definitions = result['ticketDefinitions'] || [];
+
+        // Fallback: Try a different property if definitions is empty
+        if (definitions.length === 0 && result['items']) {
+            definitions = result['items'];
+            console.log("Backend: Used 'items' fallback for tickets.");
+        }
+
+        console.log("Backend: Returning tickets count:", definitions.length);
+        return definitions;
     } catch (error) {
         console.error("Backend: getEventTickets failed", error);
         throw new Error("Unable to load tickets.");
@@ -94,10 +113,6 @@ export const createEventRSVP = webMethod(Permissions.Anyone, async (eventId, gue
     try {
         console.log("Backend: Creating RSVP for:", eventId, "Guest:", JSON.stringify(guestDetails));
 
-        /**
-         * Re-aligning with the error "rsvp.email must not be empty".
-         * Input must be wrapped in an 'rsvp' key as per the validator naming.
-         */
         const inputObject = {
             rsvp: {
                 eventId: eventId,
