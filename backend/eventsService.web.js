@@ -70,20 +70,18 @@ export const getEventTickets = webMethod(Permissions.Anyone, async (eventId) => 
 export const createEventReservation = webMethod(Permissions.Anyone, async (eventId, ticketSelection) => {
     try {
         /**
-         * Standard V2 Reservation structure.
-         * AppID for Wix Events: "14563d33-9122-4a0b-9df2-9b2f34963503"
+         * Updated to match CreateReservationOptions from documentation:
+         * options: {
+         *   ticketQuantities: [{ ticketDefinitionId, quantity }]
+         * }
          */
         const options = {
-            lineItems: ticketSelection.map((item) => ({
-                catalogReference: {
-                    catalogItemId: item.ticketId,
-                    appId: "14563d33-9122-4a0b-9df2-9b2f34963503"
-                },
+            ticketQuantities: ticketSelection.map((item) => ({
+                ticketDefinitionId: item.ticketId,
                 quantity: item.quantity
             }))
         };
 
-        // Aligned with user's verified working signature: (eventId, options)
         const result = await elevatedCreateReservation(eventId, options);
         return result;
     } catch (error) {
@@ -97,18 +95,20 @@ export const createEventReservation = webMethod(Permissions.Anyone, async (event
  */
 export const createEventRSVP = webMethod(Permissions.Anyone, async (eventId, guestDetails) => {
     try {
-        const options = {
-            guest: {
-                contactDetails: {
-                    firstName: guestDetails.firstName,
-                    lastName: guestDetails.lastName,
-                    email: guestDetails.email
-                }
-            },
+        /**
+         * Updated to match single-argument Rsvp object from documentation:
+         * createRsvp(rsvp: Rsvp)
+         * Rsvp object contains eventId, firstName, lastName, email, status.
+         */
+        const rsvpObject = {
+            eventId: eventId,
+            firstName: guestDetails.firstName,
+            lastName: guestDetails.lastName,
+            email: guestDetails.email,
             status: "YES"
         };
 
-        const response = await elevatedCreateRsvp(eventId, options);
+        const response = await elevatedCreateRsvp(rsvpObject);
         return response;
     } catch (error) {
         console.error("Failed to create RSVP:", error);
